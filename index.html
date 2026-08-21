@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>西天梵境琉璃龙壁</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #08080a; 
+            font-family: "SimSun", "STSong", "Songti SC", "Noto Serif SC", serif; 
+            color: #f2d184;
+            touch-action: none; /* 阻止移动端手势与3D交互冲突 */
+        }
+        #canvas-container { 
+            width: 100vw; 
+            height: 100vh; 
+            display: block;
+        }
+        #webcam { 
+            position: absolute; 
+            bottom: 20px; 
+            right: 20px; 
+            width: 160px; 
+            height: 120px; 
+            border-radius: 6px; 
+            transform: scaleX(-1); 
+            border: 1px solid rgba(242, 209, 132, 0.4); 
+            z-index: 10; 
+            object-fit: cover;
+        }
+        #ui { 
+            position: absolute; 
+            top: 25px; 
+            left: 25px; 
+            color: #f2d184; 
+            z-index: 10; 
+            pointer-events: none; 
+            max-width: 75vw;
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: normal;
+            letter-spacing: 3px;
+            color: #f8df9f;
+            text-shadow: 0 0 10px rgba(242, 209, 132, 0.35);
+        }
+        .instruction { 
+            font-size: 13px; 
+            color: #f2d184; 
+            margin-top: 4px; 
+            background: rgba(242, 209, 132, 0.12); 
+            border-left: 2px solid #f2d184;
+            padding: 4px 10px; 
+            border-radius: 2px; 
+            display: inline-block;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        .status { 
+            color: #f8df9f; 
+            font-size: 14px;
+            margin-bottom: 8px; 
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+        /* 小喇叭控制按钮 */
+        #music-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            z-index: 20;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(20, 18, 15, 0.75);
+            border: 1px solid rgba(242, 209, 132, 0.5);
+            cursor: pointer;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+        }
+        #music-btn:hover {
+            background: rgba(242, 209, 132, 0.25);
+            border-color: #f8df9f;
+            box-shadow: 0 0 12px rgba(242, 209, 132, 0.4);
+            transform: scale(1.05);
+        }
+        #music-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #f2d184;
+        }
+
+        /* --- 手机屏幕适配优化 (小于等于 768px 宽度) --- */
+        @media (max-width: 768px) {
+            #ui {
+                top: 14px;
+                left: 14px;
+                max-width: 70vw;
+            }
+            h2 {
+                font-size: 17px;
+                letter-spacing: 1.5px;
+                margin-bottom: 4px;
+            }
+            .status {
+                font-size: 11px;
+                margin-bottom: 6px;
+            }
+            .instruction {
+                font-size: 10px;
+                padding: 2px 6px;
+                margin-top: 3px;
+                border-left-width: 1.5px;
+            }
+            #music-btn {
+                top: 14px;
+                right: 14px;
+                width: 34px;
+                height: 34px;
+            }
+            #music-btn svg {
+                width: 16px;
+                height: 16px;
+            }
+            #webcam {
+                bottom: 12px;
+                right: 12px;
+                width: 100px;
+                height: 75px;
+            }
+        }
+    </style>
+
+    <!-- 稳定可靠的 Three.js 依赖库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <!-- MediaPipe 手势库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <!-- 纯金小喇叭按钮 -->
+    <button id="music-btn" title="音乐开关">
+        <svg id="icon-sound" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+        <svg id="icon-mute" viewBox="0 0 24 24" style="display: none;">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+    </button>
+
+    <div id="ui">
+        <h2>西天梵境琉璃龙壁</h2>
+        <div id="status" class="status">正在载入，请稍候...</div>
+        <div><span class="instruction">两指平移：旋转视角</span></div><br>
+        <div><span class="instruction">两指捏合 / 张开：缩小 / 放大画面</span></div><br>
+        <div><span class="instruction">五指张开 / 握拳：粒子消散与重组</span></div>
+    </div>
+
+    <video id="webcam" autoplay playsinline muted></video>
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 0. 全自动音频起播系统 ---
+        const musicBtn = document.getElementById('music-btn');
+        const iconSound = document.getElementById('icon-sound');
+        const iconMute = document.getElementById('icon-mute');
+
+        const bgm = new Audio('bgm.mp3');
+        bgm.loop = true;
+        bgm.volume = 0.5;
+
+        let isPlaying = false;
+        function updateMusicUI(playing) {
+            isPlaying = playing;
+            if (playing) {
+                iconSound.style.display = "block";
+                iconMute.style.display = "none";
+                musicBtn.style.opacity = "1";
+            } else {
+                iconSound.style.display = "none";
+                iconMute.style.display = "block";
+                musicBtn.style.opacity = "0.55";
+            }
+        }
+
+        // 强力自动播放与无感唤醒逻辑
+        function attemptAutoPlay() {
+            const playPromise = bgm.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    updateMusicUI(true);
+                }).catch(() => {
+                    updateMusicUI(false);
+                    const unlockEvents = ['pointerdown', 'touchstart', 'mousemove', 'keydown', 'wheel'];
+                    const autoUnlock = () => {
+                        bgm.play().then(() => {
+                            updateMusicUI(true);
+                            unlockEvents.forEach(evt => window.removeEventListener(evt, autoUnlock));
+                        }).catch(() => {});
+                    };
+                    unlockEvents.forEach(evt => window.addEventListener(evt, autoUnlock, { passive: true }));
+                });
+            }
+        }
+
+        attemptAutoPlay();
+
+        musicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isPlaying) {
+                bgm.pause();
+                updateMusicUI(false);
+            } else {
+                bgm.play().then(() => updateMusicUI(true)).catch(() => {});
+            }
+        });
+
+        // --- 1. 场景初始化 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+        camera.position.set(0, 0, 3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        let modelGroup = new THREE.Group();
+        
+        // 动态计算适合不同屏幕（电脑/手机）的基础缩放
+        function getBaseScale() {
+            const aspect = window.innerWidth / window.innerHeight;
+            if (aspect < 1.0) {
+                // 手机竖屏状态下自动缩放，保证横向居中完整展示
+                return Math.max(0.65, aspect * 1.15);
+            }
+            return 1.2;
+        }
+
+        // --- 初始姿态配置：X轴 70度 + Y轴 85度 ---
+        const INIT_ROTATION_X = (70 * Math.PI) / 180;
+        const INIT_ROTATION_Y = (85 * Math.PI) / 180;
+        let baseScale = getBaseScale();
+
+        modelGroup.rotation.x = INIT_ROTATION_X;
+        modelGroup.rotation.y = INIT_ROTATION_Y;
+        modelGroup.scale.set(baseScale, baseScale, baseScale);
+        scene.add(modelGroup);
+
+        const activeMaterials = [];
+
+        // 默认金色底纹
+        const dummyCanvas = document.createElement('canvas');
+        dummyCanvas.width = 2;
+        dummyCanvas.height = 2;
+        const dCtx = dummyCanvas.getContext('2d');
+        dCtx.fillStyle = '#e8c474';
+        dCtx.fillRect(0, 0, 2, 2);
+        const defaultFallbackTexture = new THREE.CanvasTexture(dummyCanvas);
+
+        // --- 2. GPU 粒子着色器材质 ---
+        function createParticleShaderMaterial(mapTexture) {
+            const hasTex = Boolean(mapTexture);
+            const isMobile = window.innerWidth <= 768;
+            const mat = new THREE.ShaderMaterial({
+                uniforms: {
+                    uProgress: { value: 0.0 }, 
+                    uPointSize: { value: isMobile ? 3.8 : 5.0 },
+                    uMap: { value: hasTex ? mapTexture : defaultFallbackTexture },
+                    uHasMap: { value: hasTex ? 1.0 : 0.0 },
+                    uDefaultColor: { value: new THREE.Vector3(0.95, 0.82, 0.52) }
+                },
+                vertexShader: `
+                    uniform float uProgress;
+                    uniform float uPointSize;
+                    attribute vec3 aDirection;
+                    attribute vec2 aUv;
+                    varying vec2 vUv;
+
+                    void main() {
+                        vUv = aUv;
+                        vec3 newPosition = position + aDirection * (uProgress * 2.2);
+                        newPosition.y += sin(uProgress * 4.0 + position.x * 2.0) * 0.15 * uProgress;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(
