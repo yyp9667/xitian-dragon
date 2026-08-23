@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>西天梵境琉璃龙壁</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #08080a; 
+            font-family: "SimSun", "STSong", "Songti SC", "Noto Serif SC", serif; 
+            color: #f2d184;
+        }
+        #canvas-container { width: 100vw; height: 100vh; }
+        #webcam { 
+            position: absolute; 
+            bottom: 20px; 
+            right: 20px; 
+            width: 160px; 
+            height: 120px; 
+            border-radius: 6px; 
+            transform: scaleX(-1); 
+            border: 1px solid rgba(242, 209, 132, 0.4); 
+            z-index: 10; 
+            object-fit: cover;
+        }
+        #ui { 
+            position: absolute; 
+            top: 25px; 
+            left: 25px; 
+            color: #f2d184; 
+            z-index: 10; 
+            pointer-events: none; 
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: normal;
+            letter-spacing: 3px;
+            color: #f8df9f;
+            text-shadow: 0 0 10px rgba(242, 209, 132, 0.35);
+        }
+        .instruction { 
+            font-size: 14px; 
+            color: #f2d184; 
+            margin-top: 6px; 
+            background: rgba(242, 209, 132, 0.1); 
+            border-left: 2px solid #f2d184;
+            padding: 5px 12px; 
+            border-radius: 2px; 
+            display: inline-block;
+            letter-spacing: 1px;
+        }
+        .status { 
+            color: #f8df9f; 
+            font-size: 14px;
+            margin-bottom: 12px; 
+            letter-spacing: 1px;
+            opacity: 0.9;
+        }
+        /* 小喇叭控制按钮 */
+        #music-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            z-index: 20;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(20, 18, 15, 0.75);
+            border: 1px solid rgba(242, 209, 132, 0.5);
+            cursor: pointer;
+            outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+        }
+        #music-btn:hover {
+            background: rgba(242, 209, 132, 0.25);
+            border-color: #f8df9f;
+            box-shadow: 0 0 12px rgba(242, 209, 132, 0.4);
+            transform: scale(1.05);
+        }
+        #music-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #f2d184;
+        }
+    </style>
+
+    <!-- 稳定可靠的 Three.js 依赖库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <!-- MediaPipe 手势库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <!-- 纯金小喇叭按钮 -->
+    <button id="music-btn" title="音乐开关">
+        <svg id="icon-sound" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+        <svg id="icon-mute" viewBox="0 0 24 24" style="display: none;">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+    </button>
+
+    <div id="ui">
+        <h2>西天梵境琉璃龙壁</h2>
+        <div id="status" class="status">正在载入，请稍候...</div>
+        <div><span class="instruction">两指平移：旋转视角</span></div><br>
+        <div><span class="instruction">两指捏合 / 张开：缩小 / 放大画面</span></div><br>
+        <div><span class="instruction">五指张开 / 握拳：粒子消散与重组</span></div>
+    </div>
+
+    <video id="webcam" autoplay playsinline muted></video>
+    <div id="canvas-container"></div>
+
+    <script>
+        // --- 0. 全自动音频起播系统 ---
+        const musicBtn = document.getElementById('music-btn');
+        const iconSound = document.getElementById('icon-sound');
+        const iconMute = document.getElementById('icon-mute');
+
+        const bgm = new Audio('bgm.mp3');
+        bgm.loop = true;
+        bgm.volume = 0.5;
+
+        let isPlaying = false;
+        function updateMusicUI(playing) {
+            isPlaying = playing;
+            if (playing) {
+                iconSound.style.display = "block";
+                iconMute.style.display = "none";
+                musicBtn.style.opacity = "1";
+            } else {
+                iconSound.style.display = "none";
+                iconMute.style.display = "block";
+                musicBtn.style.opacity = "0.55";
+            }
+        }
+
+        // 强力自动播放与无感唤醒逻辑
+        function attemptAutoPlay() {
+            const playPromise = bgm.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    updateMusicUI(true);
+                }).catch(() => {
+                    // 若被浏览器策略拦截，绑定微交互监听器（晃动鼠标、轻触屏幕即可瞬间出声）
+                    updateMusicUI(false);
+                    const unlockEvents = ['pointerdown', 'touchstart', 'mousemove', 'keydown', 'wheel'];
+                    const autoUnlock = () => {
+                        bgm.play().then(() => {
+                            updateMusicUI(true);
+                            unlockEvents.forEach(evt => window.removeEventListener(evt, autoUnlock));
+                        }).catch(() => {});
+                    };
+                    unlockEvents.forEach(evt => window.addEventListener(evt, autoUnlock, { passive: true }));
+                });
+            }
+        }
+
+        // 页面打开立即执行起播
+        attemptAutoPlay();
+
+        musicBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isPlaying) {
+                bgm.pause();
+                updateMusicUI(false);
+            } else {
+                bgm.play().then(() => updateMusicUI(true)).catch(() => {});
+            }
+        });
+
+        // --- 1. 场景初始化 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 1000);
+        camera.position.set(0, 0, 3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        let modelGroup = new THREE.Group();
+        
+        // --- 初始姿态配置：X轴 70度 + Y轴 85度 + 放大 1.2倍 ---
+        const INIT_ROTATION_X = (70 * Math.PI) / 180;
+        const INIT_ROTATION_Y = (85 * Math.PI) / 180;
+        const INIT_SCALE = 1.2;
+
+        modelGroup.rotation.x = INIT_ROTATION_X;
+        modelGroup.rotation.y = INIT_ROTATION_Y;
+        modelGroup.scale.set(INIT_SCALE, INIT_SCALE, INIT_SCALE);
+        scene.add(modelGroup);
+
+        const activeMaterials = [];
+
+        // 默认金色底纹
+        const dummyCanvas = document.createElement('canvas');
+        dummyCanvas.width = 2;
+        dummyCanvas.height = 2;
+        const dCtx = dummyCanvas.getContext('2d');
+        dCtx.fillStyle = '#e8c474';
+        dCtx.fillRect(0, 0, 2, 2);
+        const defaultFallbackTexture = new THREE.CanvasTexture(dummyCanvas);
+
+        // --- 2. GPU 粒子着色器材质 ---
+        function createParticleShaderMaterial(mapTexture) {
+            const hasTex = Boolean(mapTexture);
+            const mat = new THREE.ShaderMaterial({
+                uniforms: {
+                    uProgress: { value: 0.0 }, 
+                    uPointSize: { value: window.devicePixelRatio > 1 ? 5.5 : 3.5 },
+                    uMap: { value: hasTex ? mapTexture : defaultFallbackTexture },
+                    uHasMap: { value: hasTex ? 1.0 : 0.0 },
+                    uDefaultColor: { value: new THREE.Vector3(0.95, 0.82, 0.52) }
+                },
+                vertexShader: `
+                    uniform float uProgress;
+                    uniform float uPointSize;
+                    attribute vec3 aDirection;
+                    attribute vec2 aUv;
+                    varying vec2 vUv;
+
+                    void main() {
+                        vUv = aUv;
+                        vec3 newPosition = position + aDirection * (uProgress * 2.2);
+                        newPosition.y += sin(uProgress * 4.0 + position.x * 2.0) * 0.15 * uProgress;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(newPosition, 1.0);
+                        gl_PointSize = uPointSize * (1.0 / -mvPosition.z) * (1.0 - uProgress * 0.3);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform sampler2D uMap;
+                    uniform float uHasMap;
+                    uniform vec3 uDefaultColor;
+                    varying vec2 vUv;
+
+                    void main() {
+                        float dist = length(gl_PointCoord - vec2(0.5));
+                        if (dist > 0.5) discard;
+
+                        vec3 baseColor = uDefaultColor;
+                        if (uHasMap > 0.5) {
+                            vec4 texColor = texture2D(uMap, vUv);
+                            if (texColor.a > 0.01 && (texColor.r > 0.01 || texColor.g > 0.01 || texColor.b > 0.01)) {
+                                baseColor = texColor.rgb;
+                            }
+                        }
+
+                        float strength = 1.0 - (dist * 2.0);
+                        gl_FragColor = vec4(baseColor + vec3(strength * 0.15), 1.0);
+                    }
+                `,
+                transparent: true,
+                depthTest: true,
+                depthWrite: false
+            });
+
+            activeMaterials.push(mat);
+            return mat;
+        }
+
+        // --- 3. 构建粒子系统 ---
+        function buildParticles(object3d) {
+            document.getElementById('status').innerText = "加载完成，手势交互已就绪";
+
+            while (modelGroup.children.length > 0) {
+                modelGroup.remove(modelGroup.children[0]);
+            }
+            activeMaterials.length = 0;
+
+            object3d.updateMatrixWorld(true);
+            const box = new THREE.Box3().setFromObject(object3d);
+            const sizeVec = new THREE.Vector3();
+            box.getSize(sizeVec);
+            const maxDim = Math.max(sizeVec.x, sizeVec.y, sizeVec.z);
+            
+            const scaleFactor = 2.0 / (maxDim || 1);
+
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            object3d.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    const geom = child.geometry.index ? child.geometry.toNonIndexed() : child.geometry;
+                    const posAttr = geom.attributes.position;
+                    const uvAttr = geom.attributes.uv;
+
+                    if (!posAttr) return;
+
+                    const count = posAttr.count;
+                    const positions = new Float32Array(count * 3);
+                    const directions = new Float32Array(count * 3);
+                    const uvs = new Float32Array(count * 2);
+
+                    const tempVec = new THREE.Vector3();
+                    child.updateMatrixWorld(true);
+
+                    for (let i = 0; i < count; i++) {
+                        tempVec.fromBufferAttribute(posAttr, i);
+                        tempVec.applyMatrix4(child.matrixWorld);
+                        tempVec.sub(center);
+
+                        positions[i * 3] = tempVec.x * scaleFactor;
+                        positions[i * 3 + 1] = tempVec.y * scaleFactor;
+                        positions[i * 3 + 2] = tempVec.z * scaleFactor;
+
+                        const dir = new THREE.Vector3(
+                            (Math.random() - 0.5) * 2,
+                            (Math.random() - 0.3) * 2,
+                            (Math.random() - 0.5) * 2
+                        ).normalize();
+                        directions[i * 3] = dir.x;
+                        directions[i * 3 + 1] = dir.y;
+                        directions[i * 3 + 2] = dir.z;
+
+                        if (uvAttr) {
+                            uvs[i * 2] = uvAttr.getX(i);
+                            uvs[i * 2 + 1] = uvAttr.getY(i);
+                        } else {
+                            uvs[i * 2] = 0.5;
+                            uvs[i * 2 + 1] = 0.5;
+                        }
+                    }
+
+                    const particleGeometry = new THREE.BufferGeometry();
+                    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                    particleGeometry.setAttribute('aDirection', new THREE.BufferAttribute(directions, 3));
+                    particleGeometry.setAttribute('aUv', new THREE.BufferAttribute(uvs, 2));
+
+                    let mat = Array.isArray(child.material) ? child.material[0] : child.material;
+                    let texture = (mat && mat.map) ? mat.map : null;
+
+                    const particleMaterial = createParticleShaderMaterial(texture);
+                    const meshPoints = new THREE.Points(particleGeometry, particleMaterial);
+                    modelGroup.add(meshPoints);
+                }
+            });
+        }
+
+        // --- 4. 模型加载 ---
+        if (window.location.protocol === 'file:') {
+            document.getElementById('status').innerText = "提示：请使用 VSCode Live Server 运行以获得完整体验";
+        }
+
+        const objLoader = new THREE.OBJLoader();
+        const mtlLoader = new THREE.MTLLoader();
+        
+        mtlLoader.setPath('./');
+        mtlLoader.setResourcePath('./');
+        objLoader.setPath('./');
+
+        function loadDirectOBJ() {
+            objLoader.load(
+                'model.obj',
+                (obj) => buildParticles(obj),
+                (xhr) => {
+                    if (xhr.total > 0) {
+                        const percent = Math.floor((xhr.loaded / xhr.total) * 100);
+                        document.getElementById('status').innerText = `正在载入... ${percent}%`;
+                    }
+                },
+                (err) => {
+                    console.error("OBJ 加载失败:", err);
+                    document.getElementById('status').innerText = "未找到 model.obj，请确认已启动本地服务器";
+                }
+            );
+        }
+
+        mtlLoader.load(
+            'model.mtl',
+            (materials) => {
+                materials.preload();
+                objLoader.setMaterials(materials);
+                loadDirectOBJ();
+            },
+            undefined,
+            () => {
+                loadDirectOBJ();
+            }
+        );
+
+        // --- 5. MediaPipe 手势交互 ---
+        const videoElement = document.getElementById('webcam');
+        let targetRotationX = INIT_ROTATION_X; // X 轴 70 度
+        let targetRotationY = INIT_ROTATION_Y; // Y 轴 85 度
+        let targetScale = INIT_SCALE;          // 放大 1.2 倍
+        let targetDissolve = 0.0;
+
+        let lastTwoFingerCenter = null;
+        let lastPinchDist = null;
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+
+                const thumbTip = landmarks[4];
+                const indexTip = landmarks[8];
+                const middleTip = landmarks[12];
+                const wrist = landmarks[0];
+                const palmBase = landmarks[9];
+
+                // 五指张开与握拳判断
+                const palmLength = Math.hypot(wrist.x - palmBase.x, wrist.y - palmBase.y) || 0.1;
+                const handOpenDist = Math.hypot(wrist.x - middleTip.x, wrist.y - middleTip.y);
+                const isOpen = (handOpenDist / palmLength) > 1.55;
+
+                targetDissolve = isOpen ? 1.0 : 0.0;
+
+                // 两指平移与缩放
+                if (!isOpen) {
+                    const screenX = 1.0 - (thumbTip.x + indexTip.x) * 0.5;
+                    const screenY = (thumbTip.y + indexTip.y) * 0.5;
+                    const currentCenter = { x: screenX, y: screenY };
+
+                    const currentPinch = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+
+                    if (lastTwoFingerCenter !== null) {
+                        const deltaX = currentCenter.x - lastTwoFingerCenter.x;
+                        const deltaY = currentCenter.y - lastTwoFingerCenter.y;
+
+                        targetRotationY += deltaX * 4.5;
+                        targetRotationX += deltaY * 3.5;
+                    }
+
+                    if (lastPinchDist !== null) {
+                        const deltaPinch = currentPinch - lastPinchDist;
+                        if (Math.abs(deltaPinch) > 0.0015) {
+                            targetScale += deltaPinch * 4.0;
+                            targetScale = THREE.MathUtils.clamp(targetScale, 0.4, 4.5);
+                        }
+                    }
+
+                    lastTwoFingerCenter = currentCenter;
+                    lastPinchDist = currentPinch;
+
+                    document.getElementById('status').innerText = "两指操控中（平移旋转 / 捏合缩放）";
+                } else {
+                    lastTwoFingerCenter = null;
+                    lastPinchDist = null;
+                    document.getElementById('status').innerText = "粒子消散中（握拳可重组）";
+                }
+            } else {
+                lastTwoFingerCenter = null;
+                lastPinchDist = null;
+                document.getElementById('status').innerText = "请将手掌移入摄像头视野中";
+            }
+        }
+
+        const hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        hands.onResults(onResults);
+
+        const cameraFeed = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({ image: videoElement });
+            },
+            width: 640,
+            height: 480
+        });
+        cameraFeed.start();
+
+        // --- 6. 渲染循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (modelGroup) {
+                modelGroup.rotation.y += (targetRotationY - modelGroup.rotation.y) * 0.12;
+                modelGroup.rotation.x += (targetRotationX - modelGroup.rotation.x) * 0.12;
+                
+                const currentScale = modelGroup.scale.x;
+                const newScale = currentScale + (targetScale - currentScale) * 0.12;
+                modelGroup.scale.set(newScale, newScale, newScale);
+            }
+
+            for (let i = 0; i < activeMaterials.length; i++) {
+                activeMaterials[i].uniforms.uProgress.value += 
+                    (targetDissolve - activeMaterials[i].uniforms.uProgress.value) * 0.06;
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
